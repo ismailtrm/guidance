@@ -1,6 +1,6 @@
 ###################################################################
 ### Developer(s): umutzan2, ismailtrm                           ###
-### Last Update: 1/01/2022 by ismailtrm                         ###
+### Last Update: 14/11/2024 by ismailtrm                         ###
 ### Notes: upper red and lower red, configured with using cam.  ###
 ###                                                             ###
 ###################################################################
@@ -8,48 +8,52 @@
 import cv2
 import numpy as np
 
-cap = cv2.VideoCapture(0) #cap = cv2.VideoCapture("1")
+def initialize_camera(camera_index=0):
+    return cv2.VideoCapture(camera_index)
 
-upper_red = np.array([255, 255, 255])
-lower_red = np.array([171, 160, 60])
+def process_frame(frame, lower_red, upper_red, x_axis, y_axis):
+    img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(img_hsv, lower_red, upper_red)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    for contour in contours:
+        if cv2.contourArea(contour) > 500:
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 1)
+            center_x = int((w / 2) + x)
+            center_y = int((h / 2) + y)
+            cv2.circle(frame, (center_x, center_y), 2, (255, 0, 255), -1)
+            if x_axis - 20 < center_x < x_axis + 20 and y_axis - 20 < center_y < y_axis + 20:
+                cv2.putText(frame, 'Locked', (100, frame.shape[0] - 100), cv2.FONT_ITALIC, 1, (0, 0, 0), 2, cv2.LINE_AA)
 
-while True:
-    success, video = cap.read()
-    width = int(cap.get(3))
-    height = int(cap.get(4))
-    x_axis = int(cap.get(3)/2)
-    y_axis = int(cap.get(4)/2)
-    img = cv2.cvtColor(video, cv2.COLOR_BGR2HSV)
-    a = cv2.line(video, (x_axis, 0), (x_axis, height), (255, 0, 0), 1)
-    a = cv2.line(video, (0, y_axis), (width, y_axis), (255, 0, 0), 1)
-    a = cv2.circle(video, (x_axis, y_axis), 20, (0, 0, 255))
-    font = cv2.FONT_ITALIC
+    return frame
 
-    mask = cv2.inRange(img, lower_red, upper_red)
+def main():
+    upper_red = np.array([255, 255, 255])
+    lower_red = np.array([171, 160, 60])
+    
+    with initialize_camera() as cap:
+        while cap.isOpened():
+            success, frame = cap.read()
+            if not success:
+                break
 
-    mask_contours, hierarchy = cv2.findContours(
-        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            x_axis, y_axis = width // 2, height // 2
 
-    if len(mask_contours) != 0:
-        for mask_contour in mask_contours:
-            if cv2.contourArea(mask_contour) > 500:
-                x, y, w, h = cv2.boundingRect(mask_contour)
-                cv2.rectangle(video, (x, y), (x + w, y + h),
-                              (0, 255, 255), 1)
+            frame = cv2.line(frame, (x_axis, 0), (x_axis, height), (255, 0, 0), 1)
+            frame = cv2.line(frame, (0, y_axis), (width, y_axis), (255, 0, 0), 1)
+            frame = cv2.circle(frame, (x_axis, y_axis), 20, (0, 0, 255), 1)
 
-                center_x = int((w/2)+x)
-                center_y = int((h/2)+y)
+            frame = process_frame(frame, lower_red, upper_red, x_axis, y_axis)
+            cv2.imshow("window", frame)
 
-                cv2.circle(video, (center_x, center_y), 2, (255, 0, 255), -1)
+            if cv2.waitKey(1) == ord('q'):
+                break
 
-                if center_x > (x_axis-20) and center_x < (x_axis+20) and center_y > (y_axis-20) and center_y < (y_axis+20):
-                    a = cv2.putText(video, 'Kitlendi', (100, height-100),
-                                    font, 1, (0, 0, 0), 2, cv2.LINE_AA)
+    cv2.destroyAllWindows()
 
-    cv2.imshow("window", video)
-
-    if cv2.waitKey(1) == ord('q'):
-        break
-cap.release()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    main()
 
